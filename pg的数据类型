@@ -1,0 +1,2883 @@
+ PostgreSQL 提供了丰富的数据类型。用户可以使用 CREATE TYPE 命令在数据库中创建新的数据类型。PostgreSQL 的数据类型被分为四种，分别是基本数据类型、复合数据类型、域和伪类型。
+
+ 
+
+    基本数据类型是数据库内置的数据类型，包括integer、char、varchar等数据类型。表6-1列出了PostgreSQL提供的所有基本数据类型。复合数据类型是用户自己定义的，使用CREATE TYPE命令就能创建一个复合数据类型。域是一种特殊的基本数据类型，它由基本数据类型加上一个约束条件构成，使用CREATE DOMAIN命令就能创建一个域，关于域的详细信息，参考《SQL命令手册》对CREATE DOMAIN命令的解释。伪类型是具有特殊作用的数据类型，这些数据类型不能作为表的列的数据类型，只能作为函数的参数或返回值的数据类型。
+
+ 
+
+    下面的小节将会详细介绍基本数据类型、复合数据类型和伪类型。
+
+表 6-1. 基本数据类型
+
+名字
+
+描述
+
+bigint
+
+有符号 8 字节整数
+
+bigserial
+
+自增八字节整数
+
+bit [ (n) ]
+
+定长位串
+
+bit varying [ (n) ]
+
+变长位串
+
+boolean
+
+逻辑布尔量 （真/假）
+
+box
+
+平面中的长方形
+
+bytea
+
+二进制数据（"字节数组"）
+
+character varying [ (n) ]
+
+变长字符串
+
+character [ (n) ]
+
+定长字符串
+
+cidr
+
+IPv4 或者 IPv6 网络地址
+
+circle
+
+平面中的圆
+
+date
+
+日历日期（年，月，日）
+
+double precision
+
+双精度浮点数字
+
+inet
+
+IPv4 或者 IPv6 网络地址
+
+integer
+
+四字节长有符号整数
+
+interval [ (p) ]
+
+时间间隔
+
+line
+
+平面中的无限长直线
+
+lseg
+
+平面中的线段
+
+macaddr
+
+MAC 地址
+
+numeric [ (p, s) ]
+
+可选精度的准确数字
+
+path
+
+平面中的几何路径
+
+point
+
+平面中的点
+
+polygon
+
+平面中的封闭几何路径
+
+real
+
+单精度浮点数
+
+smallint
+
+有符号两字节整数
+
+serial
+
+自增四字节整数
+
+text
+
+变长字符串
+
+time [ (p) ] [ without time zone ]
+
+一天里的时间
+
+time [ (p) ] with time zone
+
+一天里的时间，包括时区
+
+timestamp [ (p) ] [ without time zone ]
+
+日期和时间
+
+timestamp [ (p) ] with time zone
+
+日期和时间
+
+tsquery
+
+全文检索查询
+
+tsvector
+
+全文检索文档
+
+txid_snapshot
+
+用户级别事务ID快照
+
+uuid
+
+通用唯一标识符
+
+xml
+
+XML数据
+
+兼容性: 下列类型是在SQL标准中定义的： bit，bit varying，boolean， char，character，character varying，varchar，date， double precision，integer， interval，numeric，decimal， real，smallint，time （包括有时区和无时区的）， timestamp （包括有时区和无时区的）。
+
+    PostgreSQL的词法分析器在解析用户发出的SQL命令时，首先将其中的单词分成五类：整数、非整数数字、字符串、标识符和关键字。大部分的非数值常量首先被认为是字符串。
+
+ 
+
+    SQL语言提供了明确地指定字符串的类型的机制。例如：
+
+
+
+SELECT 'Origin':: text AS "label", '(0,0)':: point AS "value";
+ 
+ label  | value
+--------+-------
+ Origin | (0,0)
+(1 row)
+ 
+
+在上面的例子中，用户指定'Origin' 的类型是text，'(0,0)'的类型是 point。如果用户没有明确地指定和'Origin'和'(0,0)'的数据类型，系统先把它们的类型设为unknown，以后再确定它们的具体数据类型。
+
+ 
+
+6.2 数值类型
+    数值类型包括2、4或8字节的整数，4或8字节的浮点数和可以定义精度的十进制数。 表6-2 列出了所有数值类型。
+
+表6-2. 数值类型
+
+名字
+
+存储空间
+
+描述
+
+取值区间
+
+smallint
+
+2 字节
+
+小整数
+
+-32768 到 +32767
+
+integer
+
+4 字节
+
+常用的整数
+
+-2147483648 到 +2147483647
+
+bigint
+
+8 字节
+
+大整数
+
+-9223372036854775808 到 9223372036854775807
+
+decimal
+
+变长
+
+用户定义精度，可以精确地表示小数
+
+无限制
+
+numeric
+
+变长
+
+用户定义精度，可以精确地表示小数
+
+无限制
+
+real
+
+4 字节
+
+精度可变，不能精确地表示小数
+
+精度是6个十进制位
+
+double precision
+
+8 字节
+
+精度可变，不能精确地表示小数
+
+精度是15个十进制位
+
+serial
+
+4 字节
+
+小范围的自增整数
+
+大范围的自增整数
+
+bigserial
+
+8 字节
+
+大范围的自增整数
+
+1 到 9223372036854775807
+
+    数值类型常量的语法在第1.4.4节里描述。 数值类型有一套完整的数学运算符和函数。相关信息请参考第7章。下面将详细描述这些类型。
+
+6.2.1 整数类型
+    类型 smallint、integer和 bigint 只能保存整数，也就是没有小数部分的数字。如果试图在一个整数类型中保存一个超过它能够表示的值范围的整数，数据库将会报错。
+
+    常用的类型是integer，因为它提供了在表示范围、存储空间和性能之间的最佳平衡。只有在磁盘空间紧张的情况下才使用 smallint。只有在 integer太小的时候才使用 bigint，因为在进行数学运算时，interger类型的数据bigint类型的数据要快。
+
+    SQL标准只定义了整数类型 integer(或int)、smallint和bigint。
+
+6.2.2 任意精度数值
+    numeric类型最多能存储有1000个数字位的数字并且能进行准确的数值计算。它主要用于需要准确地表示数字的场合，如货币金额。不过，对numeric 类型进行算术运算比整数类型和浮点类型要慢很多。
+
+    numeric类型有两个术语，分别是标度和精度。numeric类型的标度（scale）是到小数点右边所有小数位的个数， numeric 的精度（precision）是所有数字位的个数，因例如， 23.5141 的精度是6而标度为4。可以认为整数的标度是零。
+
+    numeric 类型的最大精度和最大标度都是可以配置的。可以用下面的语法定义一个numeric类型：
+
+（1）NUMERIC(precision, scale)
+
+（2）NUMERIC(precision)
+
+（3）NUMERIC
+
+ 
+
+    精度必须为正数，标度可以为零或者正数。在上面的第二种语法中没有指定标度，则系统会将标度设为0，所以NUMERIC(precision,0)和 NUMERIC(precision)是等价的。第三种类型的语法没有指定精度和标度，则这种类型的列可以接受任意精度和标度的numeric数据（在系统能表示的最大精度范围内），而不会对输入的数据进行精度或标度的变换。如果一个列被定义成numeric类型而且指定了标度，那么输入的数据将被强制转换成这个标度（如果它的标度比定义列的numeric的标度大），进行标度转换时的规则是四舍五入。如果输入的数据进行标度转换后得到的数据在小数点左边的数据位的个数超过了列的类型的精度减去标度的差，系统将会报告类似下面的错误：
+
+错误:  numeric类型数据溢出。
+
+细节:  precision为3, scale为3的数必须被四舍五入成小于1的数。
+
+    下面是一个实例：
+
+create table test ( col1 numeric(3,3));
+
+insert into test values(0.5678);
+
+insert into test values(0.5671);
+
+insert into test values ( 1.4);
+
+错误:  numeric类型数据溢出。
+
+细节:  precision为3, scale为3的数必须被四舍五入成小于1的数。
+
+=>select * from test;
+
+col1
+
+-------
+
+ 0.568
+
+ 0.567
+
+(2 rows)
+
+ 
+
+numeric 类型接受一个特殊的值 “NaN”，它的意思是“不是一个数字"。任何在 NaN 上面的操作都生成另外一个 NaN。 如果在 SQL 命令里把这些值当作一个常量写，必须把它用单引号引起来，比如 UPDATE table SET x = 'NaN'。在输入时，”NaN”的大小写无关紧要。
+
+ 
+
+   注意：在其它的数据库中，NaN和任何的数值数据都不相等，两个NaN也是不相等的，在postgresSQL中，为了索引实现的方便，NaN被看成大于或等于所有非NaN的数值。
+
+ 
+
+    类型 decimal和numeric是等价的，两种类型都是SQL标准定义的，SQL标准要求numeric的默认精度应该是0，PostgreSQL没有执行这个规则，为了增强程序的移植性，最好同时指定numeric的精度和标度。
+
+6.2.3 浮点类型
+数据类型 real 和 double precision 表示不准确的变精度的数字。这些类型实现了IEEE 标准754二进制浮点数算术（分别对应单精度和双精度）。
+
+ 
+
+    不准确的意思是一些数值不能准确地用real和double precision表示，存储在数据库里的只是它们的近似值。如果要求准确地保存某些数值（比如计算货币金额），应使用 numeric 类型。另外，比较两个浮点数是否相等时，可能会得到意想不到的结果。
+
+    通常，real 类型的表示的数值范围是至少-1E+37到+1E+37，精度至少是6位小数。double precision 类型表示的范围通常是-1E+308到+1E+308 ，精度是至少15位小数。太大或者太小的数值都会导致错误。如果输入数据的精度太高，会被约成可以被接受的精度。太接近零的数字，如果和0的内部表示形式一样，会产生下溢（underflow）的错误。
+
+    浮点类型还有几个特殊值：
+
+Infinity
+-Infinity
+NaN
+
+这些值分别表示 IEEE 754标准中的特殊值"正无穷大"，"负无穷大"， 以及"不是一个数字"。如果在 SQL 命令里把这些数值当作常量写，必须在它们用单引号引起来，例如UPDATE table SET x = 'Infinity'。 输入时，这些值的大小写无关紧要。
+
+ 
+
+注意：IEEE 754标准要求NaN和任何的数值数据都不相等，两个NaN也是不相等的，在postgresSQL中，为了索引实现的方便，NaN被看成大于或等于所有非NaN的数值。
+
+ 
+
+    PostgreSQL 还支持 SQL 标准中定义的类型float和float(p)。p 定义以二进制位表示的最低可以接受的精度，p的取值在1到53之间。实际上，如果p的取值在1到24之间，float(p)被看成是real类型，如果p的取值在25到53之间，float(p)被看成是double precision类型。不带精度的float被看成是double precision类型。
+
+6.2.4 序列号类型（Serial）
+    serial 和 bigserial 并不是真正的数据类型，只是为了可以给表中的数据行设置一个唯一的标识。它类似其它一些数据库中的 AUTO_INCREMENT 属性。使用它们的方法如下：
+
+CREATE TABLE tablename (
+
+        colname SERIAL
+
+);
+
+上面的命令实际上上等价于下面的两条命令：
+
+CREATE SEQUENCE tablename_colname_seq;
+
+CREATE TABLE tablename(
+
+        colname integer DEFAULT nextval('tablename_colname_seq') NOT NULL
+
+);
+
+ 
+
+    上面的命令在表中创建了一个类型为无符号整数的列，该列与一个序列对象相关联，这个序列对象的初始值是1， 表中每插入一条新的记录，该序列的值会自动加一，在向表中插入数据时，INSERT命令不要为该列指定数据，或者指定它的值为DEFAULT。
+
+    下面是一个实例：
+
+create table test3 ( product_id serial, name char(5));
+
+insert into test3(name)  values('pen');
+
+insert into test3(name)  values('car');
+
+insert into test3  values(DEFAULT, 'bike');
+
+=>select * from  test3;
+
+product_id | name
+
+------------+-------
+
+          1 | pen
+
+          2 | car
+
+          3 | bike
+
+(3 rows)
+
+ 
+
+    注意：insert命令中一定不要为serial或bigserial类型的列指定一个不是DEFAULT的值，因为对于这样的命令系统是不会报错的，会导致serial或bigserial类型的列上的数值出现混乱。
+
+6.3 字符类型
+表 6-3. 字符类型
+
+名字
+
+描述
+
+character varying(n), varchar(n)
+
+变长，最大长度有限制
+
+character(n), char(n)
+
+定长, 不足补空白
+
+text
+
+变长，最大长度没有限制
+
+     表6-3列出了PostgresSQL中可以使用的字符类型。
+
+    SQL标准定义了两种基本的字符类型：character varying(n) 和 character(n)，这里的n是一个正整数。两种类型最多可以存储n个字符。试图存储更长的字串到这些类型的列里，系统会报错，除非所有超出长度n的字符都是空格（这种情况下该字符串将被截断成长度为n的字符串）。如果要存储的字符串的长度比n小，类型为 character 的列将自动用空格填充该字符串，使它的长度达到n，而类型为 character varying 的列直接保存该字符串，不会对它进行任何处理。
+
+    如果明确将把一个数值转换成character(n)或者 character varying(n)类型，如果转换以后的字符串的长度超过n，那么它将被自动截断成长度为n的字符串，系统不会报错（这也是SQL标准要求的）。
+
+char(n) 和 varchar(n) 分别是 character(n)和character varying(n)的别名。没有定义长度的character 等同于 character(1)。没有定义长度的character varying类型接受任意长度的字符串，这是PostgreSQL的扩展特性。
+
+ 
+
+另外，PostgreSQL 提供了text类型，它可以存储任意长度的字符串，而且长度没有最大限制。尽管SQL标准中没有定义text类型，但许多其它 SQL 数据库系统中有这个类型。
+
+ 
+
+    character(n)类型的数据在存储时长度不足n的字符串会用空格填充，在显示数据时也会把填充的空格显示出来，但是在比较两个character类型的值的时候，字符串的所有结尾空格符号将自动被忽略，在转换成其它字符串类型的时候，character类型的值里面结尾的空格字符都会被删除。请注意，对于 character varying 和 text类型的值，结尾的空格在处理时是不会被忽略的。
+
+对于character(n) 和 character varying(n)类型，允许存储的最长字符串所占的存储空间大概1GB。如果想存储长度没有上限的长字串，那么使用 text类型或者没有指定长度的character varying。
+
+ 
+
+   提示: 这三种数据类型之间没有性能差别，不过character(n)比character varying(n)类型多使用了物理存储空间。 虽然在某些其它的数据库系统里，character(n) 比character varying(n)快一些， 但在 PostgreSQL 里没有这种情况。在大多数情况下，应该使用text或者character varying。
+
+请参考第1.4.1节和1.4.2节得到字符串常量的的语法信息，参考第7.4节得到处理字符串的运算符和函数的信息。数据库的字符集决定用于存储文本值的字符集，有关字符集的详细信息，请参考《数据库管理员指南》第5章。
+
+ 
+
+   下面是一个使用字符串的实例：
+
+CREATE TABLE test1 (a character(4));
+
+INSERT INTO test1 VALUES ('ok');
+
+INSERT INTO test1 VALUES ('ok ');  --ok后面跟了一个空格
+
+SELECT a, char_length(a) FROM test1; --函数char_length在第7.4节中有详细介绍.
+
+  a   | char_length
+
+------+-------------
+
+ ok   |           2
+
+ ok   |           2
+
+(2 rows)
+
+ 
+
+CREATE TABLE test2 (b varchar(5));
+
+INSERT INTO test2 VALUES ('ok');
+
+INSERT INTO test2 VALUES ('good      ');
+
+INSERT INTO test2 VALUES ('too long');
+
+错误:  输入的字符串对于类型character varying(5)来说过长。
+
+INSERT INTO test2 VALUES ('too long'::varchar(5)); -- 截断字符串
+
+SELECT b, char_length(b) FROM test2;
+
+   b   | char_length
+
+-------+-------------
+
+ ok    |           2
+
+ good  |           5
+
+ too l |           5
+
+ 
+
+    在 PostgreSQL 还有另外两种定长字符串类型，在表6-4 里显示。这两种类型是供系统内部使用的，应用程序不应该使用这两种类型。name类型长度当前定为 64 字节（63 可用字符加上结束符）。类型"char"（注意引号）和char(1)是不一样的，它只占一个字节的存储空间，它在系统内部当枚举类型用。
+
+表6-4。 特殊字符类型
+
+名字
+
+存储空间
+
+描述
+
+"char"
+
+1 字节
+
+单字节内部类型
+
+name
+
+64 字节
+
+对象名的内部类型
+
+ 
+
+6.4 二进制数据类型
+   bytea 类型可以存储二进制字符串，如表6-5所示。
+
+ 
+
+表6-5. 二进制数据类型
+
+名字
+
+存储空间
+
+描述
+
+bytea
+
+1或4 字节加上实际的二进制字符串
+
+变长的二进制字符串
+
+  
+
+二进制字符串是一个字节数值的序列。SQL 标准定义了一种不同的二进制字符串类型，叫做 BLOB 或者 BINARY LARGE OBJECT，其输入格式和 bytea 不同，但是提供的函数和操作符大多一样。bytea类型数据的具体含义由应用程序自己决定，数据库也提供了和普通文本字符串的处理方式类似的方法来对bytea类型数据进行输入和输出。
+
+ 
+
+可以使用字符串常量的语法来输入bytea类型的数据，对特殊的字符如单引号、反斜杠、不可打印的字符以及0，要使用转义表示法，具体用法如表6-6所示。
+
+ 
+
+表6-6. 需要进行转义处理的字符
+
+十进制数值
+
+描述
+
+输入格式
+
+例子
+
+输出格式
+
+0
+
+零
+
+'//000'
+
+select '//000'::bytea;
+
+/000
+
+39
+
+单引号
+
+'/'' 或者 '//047'
+
+select '/''::bytea;
+
+'
+
+92
+
+反斜杠
+
+'////' 或者 '//134'
+
+select '////'::bytea;
+
+//
+
+0 到 31 和 127 到 255
+
+不可打印的字符
+
+'//xxx' （八进制值）
+
+SELECT '//001'::bytea;
+
+/001
+
+   
+
+bytea类型的数据在输出时也要进行转义处理，反斜杠用两个反斜杠表示，不可打印的字符用反斜杠加上表示它们的值的三个八进制位表示，可打印的字符用它们自身表示。如表6-7所示。
+
+表6-7. bytea 输出格式
+
+十进制数值
+
+描述
+
+转义以后的输出个数
+
+例子
+
+输出结果
+
+92
+
+反斜杠
+
+//
+
+select '//134'::bytea;
+
+//
+
+0 到 31 和 127 到 255
+
+不可打印的八进制字符
+
+/xxx(octal value)
+
+select '//001'::bytea;
+
+/001
+
+32 到 126
+
+可打印的八进制字符
+
+客户端字符集表现形式
+
+（1）select '//175'::bytea;
+
+（2）select '//165//166'::bytea
+
+（1）}
+
+（2）uv
+
+ 
+
+6.5 日期/时间类型
+    PostgreSQL 支持 SQL标准中所有的日期和时间类型，如表6-8所示。这些数据类型上可以进行的操作在第7.9节里描述。
+
+表6-8. 日期/时间类型
+
+名字
+
+存储空间大小
+
+描述
+
+最小值
+
+最大值
+
+分辨率
+
+timestamp [ (p) ] [ without time zone ]
+
+8 bytes
+
+包括日期和时间
+
+4713 BC
+
+294276 AD
+
+1微妙/ 14 位
+
+timestamp [ (p) ] with time zone
+
+8 bytes
+
+包括日期和时间，带时区
+
+4713 BC
+
+294276 AD
+
+1微妙/ 14 位
+
+interval [ (p) ]
+
+12 bytes
+
+时间间隔
+
+-178000000 年
+
+178000000 年
+
+1微妙/ 14 位
+
+date
+
+4 bytes
+
+只有日期
+
+4713 BC
+
+5874897 AD
+
+1 天
+
+time [ (p) ] [ without time zone ]
+
+8 bytes
+
+只有时间
+
+00:00:00
+
+24:00:00
+
+1微妙/ 14 位
+
+time [ (p) ] with time zone
+
+12 bytes
+
+只有时间，带时区
+
+00:00:00+1459
+
+24:00:00-1459
+
+1微妙/ 14 位
+
+time、timestamp 和interval可以定义精度值p，这个精度值定义用来表示秒的小数位的个数，默认的情况下，没有精度限制。对于timestamp和interval，p的取值范围是0到6（实际的精度可能小于6）。对于time，p的取值范围是0到10。
+
+ 
+
+    类型time with time zone是SQL标准定义的，这个类型有些多余。在大多数情况下，date、time、timestamp without time zone 和 timestamp with time zone 的组合就能满足任何应用需求。
+
+    类型 abstime和reltime 是低分辨率时间类型，它们是数据库内部使用的类型，在应用程序里面不应该使用这两个类型。
+
+6.5.1 日期/时间输入
+     日期和时间可以用多种格式来表示，包括 ISO 8601、SQL标准中定义的格式等。对于一些格式，日期输入里的月和天的表示可能会有歧义，如果参数DateStyle 被设置为 MDY，数据库将按“月－日－年”的格式来解释输入的数据，DMY 表示“日－月－年”，而 YMD表示“年－月－日”。
+
+ 
+
+    PostgreSQL在处理日期/时间输入上比SQL标准要灵活得多。像一个文本字符串一样，任何日期或时间的输入都必须用单引号括起来。SQL标准定义的语法如下：
+
+type [ (p) ] 'value'
+
+    对于time、timestamp和 interval类型的数据可以指定精度p，p的取值范围上一节已经讲过。如果没有定义p，默认是输入的时间常量的精度。 表6-9、6-10和6-11列出了日期/时间数据在输入和输出时使用的关键字。
+
+表6-9. 表示月的关键字
+
+月
+
+缩写
+
+January
+
+Jan
+
+February
+
+Feb
+
+March
+
+Mar
+
+April
+
+Apr
+
+May
+
+ 
+
+June
+
+Jun
+
+July
+
+Jul
+
+August
+
+Aug
+
+September
+
+Sep, Sept
+
+October
+
+Oct
+
+November
+
+Nov
+
+December
+
+Dec
+
+表6-10. 表示天的关键字
+
+天
+
+缩写
+
+Sunday
+
+Sun
+
+Monday
+
+Mon
+
+Tuesday
+
+Tue, Tues
+
+Wednesday
+
+Wed, Weds
+
+Thursday
+
+Thu, Thur, Thurs
+
+Friday
+
+Fri
+
+Saturday
+
+Sat
+
+ 
+
+表6-11. 日期/时间域修饰符
+
+标识符
+
+   描述
+
+ABSTIME
+
+忽略
+
+AM
+
+12:00以前的时间
+
+AT
+
+忽略
+
+JULIAN, JD, J
+
+下一个域用儒略日表示（Julian Day）
+
+ON
+
+忽略
+
+PM
+
+12:00以后的时间
+
+T
+
+下一个域是时间
+
+ 
+
+6.5.1.1 日期
+   表6-12 显示了date 类型可能的输入格式。
+
+表6-12. 日期格式
+
+例子
+
+描述
+
+January 8, 1999
+
+无论参数datestyle取任何值，都没有歧义
+
+1999-01-08
+
+ISO-8601 格式，任何模式下都是1999年1月8号（推荐使用该格式）
+
+1/8/1999
+
+有歧义，在MDY下是1月8日；在 DMY 模式下是做8月1日
+
+1/18/1999
+
+在MDY模式下是1月18日，其它模式下被拒绝
+
+01/02/03
+
+MDY 模式下的2003年一月2日； DMY 模式下的 2003 年 2月 1日； YMD 模式下的2001年二月三日
+
+1999-Jan-08
+
+任何模式下都是1月8日
+
+Jan-08-1999
+
+任何模式下都是1月8日
+
+08-Jan-1999
+
+任何模式下都是1月8日
+
+99-Jan-08
+
+在 YMD 模式下是1月8日，其它模式报错
+
+08-Jan-99
+
+1月8日，YMD 模式下会报错
+
+Jan-08-99
+
+1月8日，YMD 模式下会报错
+
+19990108
+
+ISO-8601; 任何模式下都是1999年1月8日
+
+990108
+
+ISO-8601; 任何模式下都是1999年1月8日
+
+1999.008
+
+年和年里的第几天
+
+J2451187
+
+儒略日
+
+January 8, 99 BC
+
+公元前99年
+
+6.5.1.2 时间
+      时间类型包括 time [ (p) ] without time zone 和 time [ (p) ] with time zone。 只写 time 等同于 time without time zone。对于类型time [ (p) ] with time zone，需要同时指定时间和日期。如果在 time without time zone 类型的输入中指定了时区，时区会被忽略。
+
+表6-13. 时间输入
+
+例子
+
+描述
+
+04:05:06.789
+
+ISO 8601
+
+04:05:06
+
+ISO 8601
+
+04:05
+
+ISO 8601
+
+040506
+
+ISO 8601
+
+04:05 AM
+
+与 04:05 一样；AM 不影响数值
+
+04:05 PM
+
+与 16:05一样；输入小时数必须 <= 12
+
+04:05:06.789-8
+
+ISO 8601
+
+04:05:06-08:00
+
+ISO 8601
+
+04:05-08:00
+
+ISO 8601
+
+040506-08
+
+ISO 8601
+
+04:05:06 PST
+
+带缩写的时区
+
+2003-04-12 04:05:06 America/New_York
+
+带全称的时区
+
+表6-14. 时区输入
+
+例子
+
+描述
+
+PST
+
+太平洋标准时间（Pacific Standard Time）
+
+America/New_York
+
+时区全称
+
+PST8PDT
+
+POSIX风格的时区名称
+
+-8:00
+
+ISO-8601 与 PST 的偏移
+
+-800
+
+ISO-8601 与 PST 的偏移
+
+-8
+
+ISO-8601 与 PST 的偏移
+
+Zulu
+
+军方对 UTC 的缩写（译注：可能是美军）
+
+Z
+
+zulu 的缩写
+
+视图pg_timezone_names列出了所有可以识别的时区名。
+
+6.5.1.3 时间戳（timestamp）
+       时间戳类型的输入由一个日期和时间的联接组成，后面跟着一个可选的时区，一个可选的 AD 或者 BC（AD/BC 可以出现在时区前面，但最好放在时区的后面）。下面是两个实例，它们兼容ISO 8601：
+
+（1）1999-01-08 04:05:06
+
+（2）1999-01-08 04:05:06 -8:00
+
+ 
+
+还可以使用下面的格式
+
+January 8 04:05:06 1999 PST
+
+   
+
+SQL标准通过查看符号"+" 或 "-" 是否存在来区分常量的类型是 timestamp without time zone还是timestamp with time zone。 例如，TIMESTAMP '2004-10-19 10:23:54'的类型timestamp without time zone，TIMESTAMP '2004-10-19 10:23:54+02'的类型是timestamp with time zone。PostgreSQL不使用这个规则，因此前面的两个例子的例子都会被认为timestamp without time zone。在PostgreSQL中，timestamp without time zone类型的常量前面必须加上TIMESTAMP WITH TIME ZONE, 例如，TIMESTAMP WITH TIME ZONE '2004-10-19 10:23:54+02'。
+
+    
+
+timestamp without time zone类型的常量中如果有时区信息，时区信息会被系统自动忽略。
+
+    
+
+timestamp with time zone类型的数据的内部存储的格式总是UTC（全球统一时间，以前也叫格林威治时间GMT）。如果一个输入值中指定了时区，系统将以该时区为依据将它转换为UTC格式，如果在输入的值中没有指定声明，系统以参数timezone的值作为指定时区为依据，将它转换为UTC格式。
+
+ 
+
+如果要输出一个 timestamp with time zone类型的数据，它总是从 UTC被转到参数timezone指定的时区，并被显示为该时区的本地时间。 要看其它时区的该时间，要么修改 参数参数timezone的值，要么使用 AT TIME ZONE 子句（参考第7.9.3节）。
+
+ 
+
+       在 timestamp without time zone 和 timestamp with time zone 之间的进行转换是通常假设 timestamp without time zone 数值的时区是参数timezone 指定的时区。可以用AT TIME ZONE 指定其它的时区。
+
+6.5.1.4 时间间隔
+    interval类型的数值可以用下面语法来定义：
+
+[@] quantity unit [quantity unit...] [direction]
+
+这里quantity 是一个数字（可能有符号），unit 是 microsecond、 millisecond、second、 minute,、hour、day、 week、month、year、decade、century、millennium或者这些单位的缩写或复数，direction 可以是 ago 或者为空。符号 “@” 是可选的，可以不写。
+
+ 
+
+    天、小时、分钟以及秒的数值的后面可以不用明确地跟单位。 比如，“1 12:59:10” 和 “1 day 12 hours 59 min 10 sec”是等价的。
+
+    可选精度 p 的取值在0到6 之间，默认是输入的常量的精度。
+
+ 
+
+6.5.1.5 特殊值
+        PostgreSQL 为方便起见支持几个特殊输入值，所有这些值在SQL命令里作为常量使用时，要用单引号引起来。now、today、tomorrow和yesterday在被读取时会被自动转换为普通的日期或时间值。
+
+表 6-15. 特殊日期/时间输入
+
+输入的字符串
+
+有效的数据类型
+
+描述
+
+Epoch
+
+date, timestamp
+
+1970-01-01 00:00:00+00 (Unix 系统零时)
+
+infinity
+
+timestamp
+
+比任何其它时间戳都晚
+
+-infinity
+
+timestamp
+
+比任何其它时间戳都早
+
+Now
+
+date, time, timestamp
+
+当前事务开始的时间
+
+Today
+
+date, timestamp
+
+今日午夜
+
+tomorrow
+
+date, timestamp
+
+明日午夜
+
+yesterday
+
+date, timestamp
+
+昨日午夜
+
+allballs
+
+time
+
+00:00:00.00 UTC
+
+   
+
+下列与SQL标准兼容的函数也可以用于获取对应数据类型的当前值： CURRENT_DATE，CURRENT_TIME， CURRENT_TIMESTAMP，LOCALTIME， LOCALTIMESTAMP。最后四个函数接受一个可选的秒的精度值（在第7.9.4节里对这些函数有详细描述）。
+
+6.5.2 日期/时间输出
+        时间/日期类型的输出格式有四种：ISO 8601、SQL（Ingres）、传统的POSTGRES和German。可以使用命令SET datestyle来设置时间/日期类型的输出格式， 默认是 ISO 格式（SQL 标准要求使用 ISO 8601 格式）。表 6-16 列出了了每种输出格式的实例。
+
+表 6-16. 日期/时间输出格式
+
+类型
+
+描述
+
+例子
+
+ISO
+
+ISO-8601/SQL 标准
+
+1997-12-17 07:37:16-08
+
+SQL
+
+传统风格
+
+12/17/1997 07:37:16.00 PST
+
+POSTGRES
+
+原始风格
+
+Wed Dec 17 07:37:16 1997 PST
+
+German
+
+地区风格
+
+17.12.1997 07:37:16.00 PST
+
+    如果参数datestyle里有DMY 信息，在SQL和POSTGRES风格里，日期在月份之前出现，否则月份出现在日期之前。表6-17 是另外一些实例。
+
+表 6-17. 日期顺序
+
+类型
+
+描述
+
+例子
+
+SQL, DMY
+
+日/月/年
+
+17/12/1997 15:37:16.00 CET
+
+SQL, MDY
+
+月/日/年
+
+12/17/1997 07:37:16.00 PST
+
+Postgres, DMY
+
+日/月/年
+
+Wed 17 Dec 07:37:16 1997 PST
+
+  
+
+ interval 的输出格式和输入格式类似，century 和 week 被转换成年和日，而 ago 被转换成合适的符号。在 ISO 模式下输出格式如下：
+
+[ quantity unit [ ... ] ] [ days ] [ hours:minutes:secondes ]
+
+ 
+
+    可以用命令SET datestyle来设置日期/时间的输出格式，也可以在文件postgresql.conf 里修改参数DateStyle 的值。也可以用函数to_char（参阅第7.8节）更灵活地控制输出格式。
+
+6.5.3时区
+     PostgreSQL 目前支持 1902 年到 2038 年之间的夏时制时间（对应于传统 Unix 系统时间的表示的范围）。如果时间超过这个范围，那么假设时间是选取的时区的"标准时间"。SQL 标准在日期和时间类型和功能上有一些混乱，下面是两个常见的问题：
+
+（1）date （日期）类型与时区没有关联，而 time （时间）类型却有或可以与时区关联。然而现实世界的时区必须与与时间和日期同时关联才有意义。
+
+（2）默认的时区用同UTC的偏移来表示。因此，当在 DST 的边界进行日期/时间运算时，无法将时间转换成夏时制时间。
+
+ 
+
+    为了解决这些问题，建议在使用时区的时候，使用那些同时包含日期和时间的日期/时间类型。建议不要使用类型 time with time zone （保留此类型是为了同SQL标准兼容）。
+
+    PostgresSQL有三种方式来指定时区名：
+
+（1）使用时区的全称，例如America/New_York，视图pg_timezone_names列出了所有可以识别的时区名。
+
+（2）使用时区的缩写，例如PST，视图pg_timezone_names列出了所有可以识别的时区缩写。
+
+（3）POSXI风格的时区表示法，例如PST8PDT。
+
+ 
+
+在实际的应用中，最好使用全称的时区名。参数timezone和log_timezone的值不能使用缩写的时区表示方式，运算符AT TIME ZONE可以使用缩写的时区表示方式。时区名称不区分大小写，所有的时区信息存放在数据库软件的安装目录的子目录.../share/timezone/ 和.../share/timezonesets/里面。
+
+ 
+
+    可以在 文件postgresql.conf 里设置配置参数 timezone，还可以用下面的方法来设置时区：
+
+如果文件postgresql.conf 里没有设置timezone，服务器试图使用服务器主机上的操作系统环境变量TZ的值作为服务器的默认时区。 如果没有定义TZ，或者TZ的值是 PostgreSQL 无法识别的时区， 那么服务器将通过检查C 库函数 localtime() 的行为确定来操作系统的默认时区（如果postgresql.conf 里没有设置参数log_timezone，这些规则也用来确定参数log_timezone的值）。
+
+SQL 命令 SET TIME ZONE 为会话设置时区，它等价与命令SET TIMEZONE TO。
+
+ 
+
+6.5.4 内部实现
+    PostgreSQL 使用儒略历法（Julian dates）来进行所有的日期/时间计算。 这种方法假设一年的长度是365.2425天，它可以很精确地计算从4713 BC（公元前4713年）到很远的的未来的任意一天的日期。
+
+6.6 布尔类型
+    PostgreSQL 支持SQL标准中定义的 boolean 数据类型。boolean类型只能有两个取值：真(True) 或假(False)。空值表示状态未知（unknown）。可以使用下列常量来表示”真”,它们是等价的，推荐使用TRUE：
+
+TRUE
+
+'t'
+
+'true'
+
+'y'
+
+'yes'
+
+'1'
+
+使用下列常量来表示假，它们是等价的，推荐使用FALSE：
+
+FALSE
+
+'f'
+
+'false'
+
+'n'
+
+'no'
+
+'0'
+
+ 
+
+    下面是使用布尔类型的实例：
+
+CREATE TABLE test1 (a boolean, b text);
+
+INSERT INTO test1 VALUES (TRUE, 'sic est');
+
+INSERT INTO test1 VALUES (FALSE, 'non est');
+
+SELECT * FROM test1;
+
+ a |    b
+
+---+---------
+
+ t | sic est
+
+ f | non est
+
+ 
+
+SELECT * FROM test1 WHERE a;
+
+ a |    b
+
+---+---------
+
+ t | sic est
+
+ 
+
+   布尔类型在存储时占用一个字节的空间。
+
+6.7 枚举类型
+   PostgtesSQL中的枚举类型类似于C语言中的enum类型。
+
+6.7.1 创建枚举类型
+   可以用命令CREATE TYPE 来创建枚举类型，例如:
+
+CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');
+
+ 
+
+   枚举类型被创建以后，可以在建表的时候使用它，例如:
+
+ 
+
+CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy');
+
+CREATE TABLE person (
+
+    name text,
+
+    current_mood mood
+
+);
+
+INSERT INTO person VALUES ('Moe', 'happy');
+
+SELECT * FROM person WHERE current_mood = 'happy';
+
+ name | current_mood
+
+------+--------------
+
+ Moe  | happy
+
+(1 row)
+
+6.7.2 枚举类型的排序
+      枚举类型的值的顺序就是在创建类型时指定的值列表中每个值出现的顺序。可以对枚举类型进行比较操作，也可以使用集函数，例如:
+
+ 
+
+INSERT INTO person VALUES ('Larry', 'sad');
+
+INSERT INTO person VALUES ('Curly', 'ok');
+
+SELECT * FROM person WHERE current_mood > 'sad';
+
+ name  | current_mood
+
+-------+--------------
+
+ Moe   | happy
+
+ Curly | ok
+
+(2 rows)
+
+ 
+
+SELECT * FROM person WHERE current_mood > 'sad' ORDER BY current_mood;
+
+ name  | current_mood
+
+-------+--------------
+
+ Curly | ok
+
+ Moe   | happy
+
+(2 rows)
+
+ 
+
+SELECT name FROM person
+
+  WHERE current_mood = (SELECT MIN(current_mood) FROM person);
+
+ name 
+
+-------
+
+ Larry
+
+(1 row)
+
+ 
+
+6.7.3 类型安全
+      不能对两个不同的枚举类型的值进行比较操作，否则系统会报错，例如：
+
+ 
+
+CREATE TYPE happiness AS ENUM ('happy', 'very happy', 'ecstatic');
+
+CREATE TABLE holidays (                                          
+
+    num_weeks int,
+
+    happiness happiness
+
+);
+
+INSERT INTO holidays(num_weeks,happiness) VALUES (4, 'happy');
+
+INSERT INTO holidays(num_weeks,happiness) VALUES (6, 'very happy');
+
+INSERT INTO holidays(num_weeks,happiness) VALUES (8, 'ecstatic');
+
+INSERT INTO holidays(num_weeks,happiness) VALUES (2, 'sad');
+
+错误:  enum类型happiness常量语法错误: "sad"。
+
+SELECT person.name, holidays.num_weeks FROM person, holidays
+
+  WHERE person.current_mood = holidays.happiness;
+
+错误:  运算符不存在: mood = happiness。  -- mood和happiness是不同的枚举类型
+
+ 
+
+   可以将两个不同的枚举类型的值转换成其它类型的数据，然后再进行比较，例如:
+
+SELECT person.name, holidays.num_weeks FROM person, holidays
+
+  WHERE person.current_mood::text = holidays.happiness::text;
+
+ name | num_weeks
+
+------+-----------
+
+ Moe  |         4
+
+(1 row)
+
+ 
+6.7.4 实现细节
+    枚举类型的值的文本标签是区分大小写的，例如，'happy' 和'HAPPY'是不同的。另外，值的文本标签的长度不能超过63个字符。
+
+ 
+
+6.8 几何类型
+    几何数据类型表示二维空间的对象。表6-18 显示了PostgreSQL 里面所有的几何类型。最基本的类型是“点”，它是其它数据类型的基础。
+
+表 6-18. 几何类型
+
+名字
+
+存储空间
+
+描述
+
+表现形式
+
+point
+
+16 字节
+
+空间中一点
+
+(x,y)
+
+line
+
+32 字节
+
+(无限长的)直线（未完全实现）
+
+((x1,y1),(x2,y2))
+
+lseg
+
+32 字节
+
+（有限）线段
+
+((x1,y1),(x2,y2))
+
+box
+
+32 字节
+
+长方形
+
+((x1,y1),(x2,y2))
+
+path
+
+16+16n 字节
+
+闭合路径(与多边形类似)
+
+((x1,y1),...)
+
+path
+
+16+16n 字节
+
+开放路径
+
+[(x1,y1),...]
+
+polygon
+
+40+16n 字节
+
+多边形(与闭合路径类似)
+
+((x1,y1),...)
+
+circle
+
+24 字节
+
+圆(圆心和半径)
+
+<(x,y),r>（圆心与半径）
+
+    对于这些几何类型，PostgreSQL提供了许多运算符和函数。它们在第7.11节里有解释。
+
+6.8.1点（point）
+      点是最基本的几何类型。下面语法定义point类型的值：
+
+( x , y )
+
+  x , y
+
+x和y都是浮点数，表示横坐标和纵坐标。
+
+6.8.2 线段（lseg）
+    线段 （lseg）用两个点来代表。 lseg 的值用下面语法定义：
+
+( ( x1 , y1 ) , ( x2 , y2 ) )
+
+  ( x1 , y1 ) , ( x2 , y2 ) 
+
+    x1 , y1   ,   x2 , y2
+
+这里的 (x1,y1)， (x2,y2) 是线段的端点。
+
+6.8.3 长方形（box）
+    长方形是用两个对角个点来表示的。 它的值用下面的语法定义：
+
+（1）( ( x1 , y1 ) , ( x2 , y2 ) )
+
+（2）( x1 , y1 ) , ( x2 , y2 ) 
+
+（3） x1 , y1   ,   x2 , y2
+
+(x1,y1) 和 (x2,y2) 是长方形的一对对角点。
+
+ 
+
+长方形的数据在输出使用第一种语法。
+
+6.8.4路径（path）
+    路径由一系列连接的点组成。路径可能是开路的，列表中第一个点和最后一个点没有连接，也可能是闭路的，第一个和最后一个点连接起来。
+
+path 的值用下面语法定义：
+
+（1）( ( x1 , y1 ) , ... , ( xn , yn ) )
+
+（2）[ ( x1 , y1 ) , ... , ( xn , yn ) ]
+
+（3）( x1 , y1 ) , ... , ( xn , yn ) 
+
+（4） ( x1 , y1   , ... ,   xn , yn ) 
+
+（5） x1 , y1   , ... ,   xn , yn   
+
+    这里的点是构成路径的线段的端点。 方括弧[]表明路径是开路的，圆括弧()表明路径是闭路的。
+
+    路径的数据在输出时使用第一种语法。
+
+6.8.5多边形（polygon）
+     多边形由一系列点代表（多边形的顶点）。多边形在概念上与闭路路径一样，但是它与闭路路径的存储方式不一样而且有自己的一套支持函数。
+
+    polygon 的值用下列语法定义：
+
+（1）( ( x1 , y1 ) , ... , ( xn , yn ) )
+
+（2）( x1 , y1 ) , ... , ( xn , yn ) 
+
+（3） ( x1 , y1   , ... ,   xn , yn ) 
+
+（4）  x1 , y1   , ... ,   xn , yn   
+
+这里的点是组成多边形边界的线段的端点。
+
+    多边形数据在输出使用第一种语法。
+
+6.8.6圆（circle）
+    圆由一个圆心和一个半径表示。 circle 的值用下面语法定义：
+
+（1）< ( x , y ) , r >
+
+（2）( ( x , y ) , r )
+
+（3） ( x , y ) , r 
+
+（4） x , y   , r 
+
+这里的 (x,y) 是圆心，而r圆的半径。
+
+    圆的数据在输出时使用第一种格式。
+
+ 
+
+6.9 网络地址类型
+    PostgreSQL 提供了用于存储 IPv4、IPv6和MAC地址的数据类型，如表6-19所示。 使用这些数据类型存储网络地址比用纯文本类型要好，因为这些类型提供输入错误检查和一些特许的运算符和函数来处理网络地址（参考第7.12节）。
+
+表 6-19. 网络地址类型
+
+名字
+
+存储空间
+
+描述
+
+cidr
+
+7 或 19 字节
+
+IPv4 和 IPv6 网络
+
+inet
+
+7 或 19 字节
+
+IPv4 或 IPv6 网络和主机
+
+macaddr
+
+6 字节
+
+MAC 地址
+
+    
+
+在对inet 或者cidr 类型的数据进行排序的时候，IPv4 地址总是排在 IPv6 地址前面，包括那些封装在IPv6地址里面或映射成 IPv6 地址的 IPv4 地址，例如::10.2.3.4 或者::ffff::10.4.3.2。
+
+6.9.1 inet
+    inet类型保存一个主机 IPv4 或IPv6 地址，也可以同时保存该主机所在的子网信息。子网是通过掩码来表示的。如果网络掩码是32并且地址是IPv4，那么它不表示任何子网，只是表示一台主机。在 IPv6 里，地址长度是 128 位，因此 128 位掩码表示一个唯一的主机地址。注意如果只想保存网络地址，应该使用 cidr 而不是 inet。
+
+   
+
+该类型的输入格式是“地址/y ”，这里的地址是 IPv4 或者 IPv6 ，y 是子网掩码的位数的位数 如果省略“/y”， 则子网掩码对 Ipv4 是 32，对 IPv6 是 128，所以该值表示只有一台主机。数据在显示时，如果y等于32，”/32”不会被显示出来。
+
+6.9.2 cidr
+    cidr保存一个IPv4 或 IPv6 类型的网络地址。其输入和输出格式遵守无类域间路由（Classless Internet Domain Routing）标准。它的格式是“地址/y”，这里 的地址 是 IPv4 或 IPv6 网络地址，y是 网络掩码的二进制位数。如果省略/y， 那么掩码的大小用传统的IP地址分类系统计算出来（IP地址分为四类，分别是A、B、C和D）。如果网络地址中对应非网络掩码的二进制位中出现了“1”，则不是一个合法的cidr类型的数据，例如，192.168.1.0/16就不是一个合法的cidr地址。
+
+    
+
+表6-20是CIDR实例：
+
+表6-20. cidr 类型输入实例
+
+cidr 输入
+
+cidr 显示
+
+函数abbrev(cidr)的输出
+
+192.168.100.128/25
+
+192.168.100.128/25
+
+192.168.100.128/25
+
+192.168/24
+
+192.168.0.0/24
+
+192.168.0/24
+
+192.168/25
+
+192.168.0.0/25
+
+192.168.0.0/25
+
+192.168.1
+
+192.168.1.0/24
+
+192.168.1/24
+
+192.168
+
+192.168.0.0/24
+
+192.168.0/24
+
+128.1
+
+128.1.0.0/16
+
+128.1/16
+
+128
+
+128.0.0.0/16
+
+128.0/16
+
+128.1.2
+
+128.1.2.0/24
+
+128.1.2/24
+
+10.1.2
+
+10.1.2.0/24
+
+10.1.2/24
+
+10.1
+
+10.1.0.0/16
+
+10.1/16
+
+10
+
+10.0.0.0/8
+
+10/8
+
+10.1.2.3/32
+
+10.1.2.3/32
+
+10.1.2.3/32
+
+2001:4f8:3:ba::/64
+
+2001:4f8:3:ba::/64
+
+2001:4f8:3:ba::/64
+
+2001:4f8:3:ba:2e0:81ff:fe22:d1f1/128
+
+2001:4f8:3:ba:2e0:81ff:fe22:d1f1/128
+
+2001:4f8:3:ba:2e0:81ff:fe22:d1f1
+
+::ffff:1.2.3.0/120
+
+::ffff:1.2.3.0/120
+
+::ffff:1.2.3/120
+
+::ffff:1.2.3.0/128
+
+::ffff:1.2.3.0/128
+
+::ffff:1.2.3.0/128
+
+6.9.3 inet 与 cidr 对比
+    inet 和cidr 类型之间的本质区别在于inet 地址中对应非网络掩码的二进制位中可以出现“1”，cidr 则不接受这种形式的地址。
+
+    提示: 不喜欢inet或cidr值的输出格式，可以使用函数host、text 和 abbrev。
+
+6.9.4 macaddr
+    macaddr 类型存储 MAC 地址，例如，以太网网卡的硬件地址（MAC 地址还用于其它用途）。MAC地址有下面几种格式，它们都指定的是同一个地址：
+
+'08002b:010203'
+
+'08002b-010203'
+
+'0800.2b01.0203'
+
+'08-00-2b-01-02-03'
+
+'08:00:2b:01:02:03'
+
+ 
+
+     对于a 到 f，大小写都可以。输出总是采用上面列出的最后一种形式。
+
+ 
+
+6.10 位串类型
+        位串是由 1和0的组成的串。有两种位串类型 bit(n)和bit varying(n)，n是一个正整数。
+
+bit(n)类型的数据必须准确地匹配长度n，否则系统会报错。bit varying类型可以接受变长位串，但位串的长度也不能超过n。bit 等同于 bit(1)，没有指定长度的bit varying 类型的长度将没有限制。
+
+ 
+
+       注意: 如果明确地把一个位串值转换成 bit(n)类型，那么它的右边将被截断或者在右边补齐零，直到刚好构成n 位位串，系统不会报错。类似地，如果明确地把一个位串数值转换成 bit varying(n)，如果它的长度超过了n 位，那么它的超出n的部分将被自动截掉。
+
+    
+
+位串常量的语法的信息详见第1.4.3节。用于位串的运算符和函数，在第7.6节里有详细描述。
+
+        下面是使用位串的实例：
+
+CREATE TABLE test (a BIT(3), b BIT VARYING(5));
+
+INSERT INTO test VALUES (B'101', B'00');
+
+INSERT INTO test VALUES (B'10', B'101');
+
+错误:  位串长度2与类型bit(3)不匹配。
+
+INSERT INTO test VALUES (B'10'::bit(3), B'101');
+
+SELECT * FROM test;
+
+  a  |  b
+
+-----+-----
+
+ 101 | 00
+
+ 100 | 101
+
+ 
+
+6.11 UUID 类型
+       uuid类型用于存储RFC 4122和ISO/IEC 9834-8:2005中定义的通用唯一标识符（stores Universally Unique Identifiers，UUID），有一些数据库中把这个类型称为GUID（globally unique identifier）。UUID由一个128位的数字构成，它的标准的输入格式由32个小写的十六进制位组成，这32个十六进制位被分成4个组，第一个组有包含8个十六进制位，接下来的三个组个包含4个十六进制位，最后一个组包含12个十六进制位。不同的组横杠分开(-)，例如：a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11。
+
+ 
+
+        PostgreSQL还接受下面几种格式，其中的十六进制位可以是大写的：
+
+（1）A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A11
+
+（2）{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}
+
+（3）a0eebc999c0b4ef8bb6d6bb9bd380a11
+
+ 
+
+        uuid类型的数据在输出时总是使用上面的第一种格式。PostgreSQL只是负责存储uuid类型的数据，同时提供了UUID类型的比较函数，但不提供任何产生UUID的函数（因为没有任何一个算法是适合所有的应用类型的），应用程序必须自己开发生成uuid的函数。
+
+ 
+
+6.12 XML 类型
+数据库可以用xml类型来存储xml数据，也可以用text类型来存储xml文档，但是text类型没有提供函数来处理xml数据，使用起来没有xml类型方便。第7.13节列出了处理XML数据的函数。
+
+xml类型可以存储xml文档（document），也可以存储由XMLDecl? content定义的xml内容片段(content)。xml内容片段可以有多个顶级元素。可以用表达式xmlvalue IS DOCUMENT来判断一个xml值是xml文档还是xml内容片段。
+
+6.12.1 创建xml值
+     使用函数XMLPARSE从字符串中生成xml数据，它的语法如下：
+
+XMLPARSE ( { DOCUMENT | CONTENT } value)
+
+ 
+
+     下面是一些实例：
+
+（1）XMLPARSE (DOCUMENT '<?xml version="1.0"?><book><title>Manual</title><chapter>...</chapter></book>')
+
+（2）XMLPARSE (CONTENT 'abc<foo>bar</foo><bar>foo</bar>')
+
+ 
+
+      XMLPARSE是SQL标准中定义的函数，PostgreSQL同时提供了下面的方法来创建xml值：
+
+xml '<foo>bar</foo>'
+
+'<foo>bar</foo>'::xml
+
+ 
+
+xml类型不会验证它的值中是否包含文档类型声明（Document Type Declaration，DTD）。
+
+ 
+
+      函数xmlserialize可以将xml值转还成字符串，它的语法如下：
+
+XMLSERIALIZE ( { DOCUMENT | CONTENT } value AS type )
+
+其中的类型（type）可以是character、 character varying或text（或者这些类型的别名）。
+
+ 
+
+       使用函数XMLPARSE 和XMLSERIALIZE的时候，xml值的类型由参数“xml option”来控制，可以使用SET命令来改变这个参数的值，它的语法如下（使用任何一个都可以）：
+
+（1）SET XML OPTION { DOCUMENT | CONTENT };
+
+（2）SET xmloption TO { DOCUMENT | CONTENT };
+
+xml option的默认值是CONTENT，任何形式的XML数据对于CONTENT来说都是合法的。
+
+ 
+
+ 
+
+6.12.2 编码处理
+    客户端编码、服务器编码和xml数据的编码类型可能不相同。如果使用文本模式在客户端和服务器之间传送数据，数据库会自动对字符数据进行编码类型转换（详细信息请参考《数据库管理员手册》第5章）。服务器在处理客户端发送过来的的xml数据时，数据中编码类型的声明（encoding declaration）将被忽略。服务器在将xml数据发给客户端时，其中也不会含有编码类型声明。
+
+    如果使用二进制模式在客户端和服务器之间传送数据，数据库不会对传送的数据进行编码类型转换。服务器在处理客户端发送过来的的xml数据时，会保留xml数据中的编码类型声明，如果xml数据没有定义编码类型，则认为它的编码类型是UTF-8。服务器在将xml数据发给客户端时，其中会包含xml数据的编码类型声明。
+
+    如果xml数据的编码类型、客户端的编码类型和服务器的编码类型相同，则在处理xml数据时不容易出现错误，推荐使用类型UTF-8作为xml数据的编码类型、客户端的编码类型和服务器的编码类型。
+
+6.12.3 访问XML类型的数据
+不能在xml类型的列上创建索引，如何在查询中访问xml类型的数据，在第7.13节里有详细叙述。
+
+ 
+
+ 
+
+6.13 数组
+    PostgreSQL 允许表的列的数据类型是变长的多维数组。数组的类型可以是任何基本类型、枚举类型、复合类型或用户自定义类型（不过不能是域）。
+
+6.13.1 数组类型的声明
+      下面通过一个实例来说明如何使用数组，首先建表：
+
+CREATE TABLE sal_emp (
+
+    name            text,
+
+    pay_by_quarter  integer[],
+
+    schedule        text[][]
+
+);
+
+ 
+
+       从上面的例子可以看出，一个数组类型是通过在数组元素类型名后面加上方括号（[]）来定义的。上面的命令创建了一个叫 sal_emp 的表，列name的类型是text，列pay_by_quarter的类型是一个二维整型数组，列schedule的类型是一个text类型的二维数组。 
+
+ 
+
+       也可以在建表时明确地指定数组的大小，例如：
+
+CREATE TABLE tictactoe (
+
+    squares   integer[3]
+
+);
+
+ 
+
+       在当前的实现中，系统不会检查数组中元素的个数是否超过它的大小，所以integer[3]和integer[]是等价的。 另外，系统也不会检查数组的元素是否复合数组的维数要求，所以在定义数组时，多维数组是没有意义的，它等同于定义一个一维数组，例如，intger[]、integer[][]和intger[4]都互相是等价的。对以一维数组，它的元素可以是一个简单的常量，也可以是一个数组，例如，3和{1,2} 都是数组intger[]的合法元素。
+
+ 
+
+6.13.2 数组值输入
+   一个数组常量的常见格式如下：
+
+‘{ val1 delim val2 delim ... }’
+
+这里的 delim 是该类型的分隔符（在类型对应的pg_type 记录里指定）对于PostgreSQL 提供的标准数据类型里，除了box 类型的分隔符是分号（;）外，所有其它类型的分隔符都是逗号（,）。每个 val 可以是一个数组元素类型的常量，也可以是一个子数组。例如
+
+'{{1,2,3},{4,5,6},{7,8,9}}'
+
+ 
+
+ 
+
+    如果数组元素为空值，用null或NULL来表示。
+
+ 
+
+    下面是另外一些实例：
+
+ 
+
+INSERT INTO sal_emp
+
+    VALUES ('Bill',
+
+    '{10000, 10000, 10000, 10000}',
+
+    '{{"meeting", "lunch"}, {"training", "presentation"}}');
+
+ 
+
+INSERT INTO sal_emp
+
+    VALUES ('Carol',
+
+    '{20000, 25000, 25000, 25000}',
+
+    '{{"breakfast", "consulting"}, {"meeting", "lunch"}}');
+
+ 
+
+INSERT INTO sal_emp
+
+    VALUES ('Carol',
+
+    '{20000, 25000, 25000, 25000}',
+
+    '{{"breakfast", "consulting"}, {"meeting", null}}');
+
+ 
+
+INSERT INTO sal_emp
+
+    VALUES ('Carol',
+
+    '{20000, 25000, 25000, 25000}',
+
+    '{null, null}');
+
+ 
+
+    查询表sal_emp可以得到下面的结果：
+
+ 
+
+SELECT * FROM sal_emp;
+
+ name  |      pay_by_quarter       |                 schedule
+
+-------+---------------------------+-------------------------------------------
+
+ Bill  | {10000,10000,10000,10000} | {{meeting,lunch},{training,presentation}}
+
+ Carol | {20000,25000,25000,25000} | {{breakfast,consulting},{meeting,lunch}}
+
+ Mike  | {20000,25000,25000,25000} | {{breakfast,consulting},{meeting,NULL}}
+
+ Alex  | {20000,25000,25000,25000} | {NULL,NULL}
+
+(4 rows)
+
+ 
+
+ 
+
+    也可以使用数组构造器的语法:
+
+ 
+
+INSERT INTO sal_emp
+
+    VALUES ('Bill',
+
+    ARRAY[10000, 10000, 10000, 10000],
+
+    ARRAY[['meeting', 'lunch'], ['training', 'presentation']]);
+
+ 
+
+INSERT INTO sal_emp
+
+    VALUES ('Carol',
+
+    ARRAY[20000, 25000, 25000, 25000],
+
+    ARRAY[['breakfast', 'consulting'], ['meeting', 'lunch']]);
+
+ 
+
+    注意，如果数组的元素也是数组，那么这个数组的每个元素的维数和每个维的大小必须相同，否则系统会报错，例如：
+
+（1）INSERT INTO sal_emp
+
+    VALUES ('Bill',
+
+    '{10000, 10000, 10000, 10000}',
+
+    '{{"meeting", "lunch"}, {"meeting"}}');
+
+错误:  多维数组的每个元素的维数和每个维的大小必须相同。
+
+说明：{"meeting", "lunch"}含有2个元素，{"meeting”}只有1个元素。
+
+ 
+
+ 
+
+    对于多维数组，要么它的所有元素都不是空值，要么它的所有元素都是空值。如果有些元素为空值，另外一些元素不是空值，系统将会报错，例如：
+
+（1）INSERT INTO sal_emp
+
+    VALUES ('Bill',
+
+    '{10000, 10000, 10000, 10000}',
+
+    '{{"meeting", "lunch"}, null}');
+
+错误:  数组常量语法不正确: "{{"meeting", "lunch"}, null}"。
+
+说明：{"meeting", "lunch"}不是空值，但另外一个元素是空值。如果把{"meeting", "lunch"}也改成null，则是一个合法的数组输入。
+
+6.13.3 访问数组
+      首先，演示一下如何访问数组的某个一个元素。下面的查询找出第二季度的薪水和第一季度的薪水不同的员工：
+
+SELECT name FROM sal_emp WHERE pay_by_quarter[1] <> pay_by_quarter[2];
+
+ 
+
+ name
+
+-------
+
+ Carol
+
+(1 row)
+
+ 
+
+      数组的下标是写在方括号的。默认的情况下，PostgreSQL认为数组都是一维的。
+
+      下面的查询找出所有员工的第三季度的薪水：
+
+SELECT pay_by_quarter[3] FROM sal_emp;
+
+ 
+
+ pay_by_quarter
+
+----------------
+
+          10000
+
+          25000
+
+(2 rows)
+
+ 
+
+        还可以访问一个数组的任意长方形片断，或者叫分片。对于一维或多维数组，一个数组的某一部分是用“下标下界:下标上界“表示的。例如：
+
+SELECT schedule[1:2][1:1] FROM sal_emp WHERE name = 'Bill';
+
+ 
+
+        schedule
+
+------------------------
+
+ {{meeting},{training}}
+
+ (1 row)
+
+上面的查询还可以写成下面的形式：
+
+SELECT schedule[1:2][1] FROM sal_emp WHERE name = 'Bill';
+
+  
+
+如果省略了下标下界，则下标下界默认为1，所以schedule[1:2][1]等价于schedule[1:2][1:1]，schedule[1:2][2]等价于schedule[1:2][1:2]。例如：
+
+SELECT schedule[1:2][2] FROM sal_emp WHERE name = 'Bill';
+
+ 
+
+                 schedule
+
+-------------------------------------------
+
+ {{meeting,lunch},{training,presentation}}
+
+ 
+
+(1 row)
+
+  
+
+如果查询指定的分片的下标的下界超出了数组的下标的上界，系统不会报错，将会返回一个空数组，例如：
+
+SELECT schedule[3:5][1:2] FROM sal_emp WHERE name = 'Bill';
+
+schedule
+
+----------
+
+ {}
+
+(1 row)
+
+  
+
+  如果查询指定的分片的下标的下界没有超出数组的下标的上界，但子数组的下标的上界超出了超出数组的下标的上界，系统也不会报错，会自动将子数组的下标的上界设为数组的下标的上界，例如：
+
+SELECT schedule[1:5][2] FROM sal_emp WHERE name = 'Bill';
+
+ 
+
+                 schedule
+
+-------------------------------------------
+
+ {{meeting,lunch},{training,presentation}}
+
+ 
+
+(1 row)
+
+   
+
+可以用array_dims 函数来得到任何数组的当前维数信息和和每个维对应的下标的上界与下界，例如：
+
+SELECT array_dims(schedule) FROM sal_emp WHERE name = 'Carol';
+
+ 
+
+ array_dims
+
+------------
+
+ [1:2][1:2]
+
+(1 row)
+
+   
+
+也可以用 函数array_upper 和 array_lower 得到数组指定的维数下标的上界和下界。
+
+SELECT array_upper(schedule, 1) FROM sal_emp WHERE name = 'Carol';
+
+ 
+
+ array_upper
+
+-------------
+
+           2
+
+(1 row)
+
+6.13.4 修改数组
+6.13.4.1 使用UPDATE命令
+      可以一次更新数组的的所有元素，例如：
+
+UPDATE sal_emp SET pay_by_quarter = '{25000,25000,27000,27000}'
+
+WHERE name = 'Carol';
+
+ 
+
+或者使用数组构造器，例如：
+
+UPDATE sal_emp SET pay_by_quarter = ARRAY[25000,25000,27000,27000]
+
+WHERE name = 'Carol';
+
+ 
+
+       也可以只更新数组的某一个元素：
+
+UPDATE sal_emp SET pay_by_quarter[4] = 15000
+
+WHERE name = 'Bill';
+
+ 
+
+或者更新数组的某个分片，例如：
+
+UPDATE sal_emp SET pay_by_quarter[1:2] = '{27000,27000}'
+
+    WHERE name = 'Carol';
+
+  
+
+ 如果一个数组只有n个元素，使用UPDATE命令给数组的第n+m个元素赋值，那么数组将会变成一个有n+m个元素的数组，其中的第n到第n+m-1个元素会被自动赋为空值。当前只能对一维数组进行这样的操作。
+
+   
+
+在更新一个数组片段时，指定数组的下标可以为负数，更新操作结束后，数组的下标将以负数开始，而不是从1开始，例如，顺序执行下面的几个命令，注意观察输出的结果：
+
+（1）select * from sal_emp;
+
+ name  |      pay_by_quarter       |                 schedule
+
+-------+---------------------------+-------------------------------------------
+
+ Bill  | {10000,10000,10000,10000} | {{meeting,lunch},{training,presentation}}
+
+ Carol | {20000,25000,25000,25000} | {{breakfast,consulting},{meeting,lunch}}
+
+(2 rows)
+
+ 
+
+（2）select array_dims(pay_by_quarter)  from sal_emp;
+
+ array_dims
+
+------------
+
+ [1:4]
+
+ [1:4]
+
+(2 rows)
+
+ 
+
+（3）UPDATE sal_emp SET pay_by_quarter[-1:2] = '{3,3,27000,27000}';
+
+ 
+
+（4）select array_dims(pay_by_quarter)  from sal_emp;
+
+ array_dims
+
+------------
+
+ [-1:4]
+
+ [-1:4]
+
+(2 rows)
+
+（5）select * from sal_emp;
+
+ name  |            pay_by_quarter            |                 schedule
+
+-------+--------------------------------------+-------------------------------------------
+
+ Bill  | [-1:4]={3,3,27000,27000,10000,10000} | {{meeting,lunch},{training,presentation}}
+
+ Carol | [-1:4]={3,3,27000,27000,25000,25000} | {{breakfast,consulting},{meeting,lunch}}
+
+(2 rows)
+
+ 
+
+6.13.4.2 数组连接运算符
+     可以用运算符 || 连接两个数组形成一个新的数组，例如：
+
+（1）SELECT ARRAY[1,2] || ARRAY[3,4];
+
+ ?column?
+
+-----------
+
+ {1,2,3,4}
+
+(1 row)
+
+ 
+
+（2）ELECT ARRAY[5,6] || ARRAY[[1,2],[3,4]];
+
+      ?column?
+
+---------------------
+
+ {{5,6},{1,2},{3,4}}
+
+(1 row)
+
+ 
+
+       连接运算符可以连接一个元素和一个一维数组，连接两个 N 维的数组，连接一个N维数组和一个N+1 维的数组。
+
+如果连接一个元素和一个一维数组，结果数组的下标下界与参加运算的一维数组的下标下界相同，例如：
+
+（1）SELECT array_dims(1 || '[0:1]={2,3}'::int[]);
+
+ array_dims
+
+------------
+
+ [0:2]
+
+(1 row)
+
+ 
+
+（2）SELECT array_dims(ARRAY[1,2] || 3);
+
+ array_dims
+
+------------
+
+ [1:3]
+
+(1 row)
+
+ 
+
+        如果连接连接两个 N 维的数组，结果数组的下标下界与运算符左边的数组的下标下界相同，例如：
+
+（1） SELECT array_dims('[-1:0]={2,3}'::int[] || ARRAY[1,2]);
+
+ array_dims
+
+------------
+
+ [-1:2]
+
+(1 row)
+
+ 
+
+（2）SELECT array_dims(ARRAY[1,2] || '[-1:0]={2,3}'::int[]);
+
+ array_dims
+
+------------
+
+ [1:4]
+
+(1 row)
+
+   
+
+如果连接一个 N 维数组和一个 N+1 维的数组，N维数组将变成N+1数组的一个元素。例如：
+
+（1）SELECT  ARRAY[1,2] || ARRAY[[3,4],[5,6]];
+
+      ?column?
+
+---------------------
+
+ {{1,2},{3,4},{5,6}}
+
+(1 row)
+
+（2）SELECT  ARRAY[[3,4],[5,6]] || ARRAY[1,2];
+
+      ?column?
+
+---------------------
+
+ {{3,4},{5,6},{1,2}}
+
+(1 row)
+
+ 
+
+       也可以用函数array_prepend、array_append和array_cat连接两个数组。前面两个函数只支持一维数组，array_cat支持多维数组。最好使用连接运算符，不要直接使用这些函数，在用户自定义函数中如果有必要，可以直接使用这些函数。例如：
+
+（1）SELECT array_prepend(1, ARRAY[2,3]);
+
+ array_prepend
+
+---------------
+
+ {1,2,3}
+
+(1 row)
+
+ 
+
+（2）SELECT array_append(ARRAY[1,2], 3);
+
+ array_append
+
+--------------
+
+ {1,2,3}
+
+(1 row)
+
+ 
+
+（3）SELECT array_cat(ARRAY[1,2], ARRAY[3,4]);
+
+ array_cat
+
+-----------
+
+ {1,2,3,4}
+
+(1 row)
+
+ 
+
+（4）SELECT array_cat(ARRAY[[1,2],[3,4]], ARRAY[5,6]);
+
+      array_cat
+
+---------------------
+
+ {{1,2},{3,4},{5,6}}
+
+(1 row)
+
+ 
+
+（5）SELECT array_cat(ARRAY[5,6], ARRAY[[1,2],[3,4]]);
+
+      array_cat
+
+---------------------
+
+ {{5,6},{1,2},{3,4}}
+
+6.13.5 查询数组中的数据
+     如果知道数组的大小，可以明确地引用数组中的每一个元素。例如：
+
+SELECT * FROM sal_emp WHERE pay_by_quarter[1] = 10000 OR
+
+                            pay_by_quarter[2] = 10000 OR
+
+                            pay_by_quarter[3] = 10000 OR
+
+                            pay_by_quarter[4] = 10000;
+
+ 
+
+       如果数组中的元素过多，上面的方法显然过于繁琐。另外一个方法在第7.19节里描述。可以对数组使用ANY谓词，上面的查询可以用下面的例子来代替：
+
+SELECT * FROM sal_emp WHERE 10000 = ANY (pay_by_quarter);
+
+   
+
+也可以对数组使用ALL谓词，下面的查询找出数组pay_by_quarter的所有元素的值都等于 10000 的员工的记录：
+
+SELECT * FROM sal_emp WHERE 10000 = ALL (pay_by_quarter);
+
+ 
+
+6.13.6 数组输入和输出语法
+       数组在被输出时，用一个文本字符串来表示，所有的数组元素用两个大括号（{和}）括起来，不同的数组元素用一个分割符分开。分隔符由数组元素的类型来决定，对于内置数据类型，除了box类型使用分号（;）以外，其它的数据类型的分隔符都是逗号（,），例如，下面是一个一位整型数组，它有4个元素：
+
+{1,2,3,4}
+
+   
+
+ 对于多维数组，它的每一个维的数据都要用两个大括号({和})括起来，例如，下面是一个二维数组，假设它的名字是array_two_dims：
+
+{{1,2},{3,4}}  
+
+array_two_dims[1][1]=1，array_two_dims[1][2]=2，array_two_dims[2][1]=3，array_two_dims[2][2]=4。
+
+   
+
+对于字符串类型的数组，如果它的某个元素的值中含有大括号、分隔符、双引号、反斜杠或空格，或者该值在转换成大写后是字符串NULL，在输出时，元素的值将用双引号引起来,而且值中的双引号和反斜杠前面将被自动加上一个反斜杠。在输出时，如果元素的值是空串，将会用两个双引号来表示，空值用NULL表示。
+
+ 
+
+       对于字符串类型的数组，推荐使用数组构造器来为数组输入数据，如果使用普通的字符串语法来输入数据，在元素的值中出现反斜杠和双引号的情况下，需要使用转义表示法，而且反斜杠数量要翻倍，下面的例子插入两个数组元素，第一个元素是反斜杠，第二个元素是双引号。
+
+INSERT ... VALUES (E’{"////","//""}’);
+
+ 这是因为字符串文本处理器会去掉第一层反斜杠，然后剩下的字符串就是{"//","/""}。 接着该字串被传递给 text 数据类型的输入函数，分别变成 / 和 "。
+
+ 
+
+   也可以用美元符号限定的字符串的格式来为数组输入数据，这样就可以避免使用双倍的反斜杠。
+
+      下面是一些实例：
+
+CREATE TABLE test( name text[]);
+
+insert into test values(E'{"////","//""}');
+
+insert into test values(E'{"////","//""}');
+
+insert into test values('{null,null}');  --数组的两个元素都是空值
+
+insert into test values('{"null",""}');  --数组的第一个元素是字符串null，第二个元素是一个空串
+
+insert into test values('{"ggg ",""}');
+
+select * from test;
+
+   name
+
+-------------
+
+ {"//","/""}
+
+ {"//","/""}
+
+ {NULL,NULL}
+
+ {"null",""}
+
+ {ggg,""}
+
+(5 rows)
+
+ 
+
+ 
+
+6.14 复合数据类型
+    复合数据类型由一个或多个域组成，每个域的数据类型可以是数据库的基本数据类型，也可以是复合数据类型，它类似于C语言中的结构，PostgreSQL 允许像使用简单数据类型那样使用复合数据类型 例如，一个表的某个列可以被声明为一个复合类型。
+
+6.14.1 定义复合类型
+       使用命令CREATE TYPE创建一个复合类型，例如：
+
+（1）CREATE TYPE complex AS (
+
+    r       double precision,
+
+    i       double precision
+
+);
+
+ 
+
+（2）CREATE TYPE inventory_item AS (
+
+    name            text,
+
+    supplier_id     integer,
+
+    price           numeric
+
+);
+
+ 
+
+       命令CREATE TYPE的语法类似于CREATE TABLE。
+
+       创建了复合数据类型以后，就可以用建表时使用它，例如：
+
+CREATE TABLE on_hand (
+
+    item      inventory_item,
+
+    count     integer
+
+);
+
+INSERT INTO on_hand VALUES (ROW('fuzzy dice', 42, 1.99), 1000);
+
+   
+
+也可以在函数中引用复合数据类型，例如：
+
+CREATE FUNCTION price_extension(inventory_item, integer) RETURNS numeric
+
+AS 'SELECT $1.price * $2' LANGUAGE SQL;
+
+ 
+
+SELECT price_extension(item, 10) FROM on_hand;
+
+      
+
+创建表的时候，系统会自动创建一个复合数据类型，它的名字与表的名字相同，所以实际上用户自定义的复合类型与数据库中的表是不能同名的，否则系统会报错，例如：
+
+CREATE TABLE test( name text[])；
+
+CREATE TYPE test AS (
+
+r double precision,
+
+i double precision
+
+);
+
+ 
+
+错误： 表test已经存在。
+
+6.14.2 复合类型值的输入和输出格式
+     复合类型常量的一般格式如下：
+
+'( val1 , val2 , ... )'
+
+ 
+
+例如，'("fuzzy dice",42,1.99)'就是前面创建的inventory_item类型的值。
+
+   
+
+如果值列表中的值的个数比复合类型的域的个数少，那么复合类型的排在前面的域将被赋给值列表中对应的值，剩下的域将被置为空值（NULL）。例如，下面这个常量将inventory_item的第三个域置为空值：
+
+'("fuzzy dice",42,)'
+
+   
+
+如果复合数据类型的某个域的值是空串，则用两个双引号表示，例如：
+
+'("",42,)'
+
+ 
+
+ 另外如果想把某个域的值设为空值，逗号与逗号（或括号）之间不要出现任何字符。例如，下面的常量将inventory_item的第二个域设为空值：
+
+'("",,1.8)'
+
+下面的常量将inventory_item的所有域都设为空值：
+
+'(,,)'
+
+ 
+
+       也可以用数据行构造器（相信信息参考第2.12节）的语法来构造复合类型值，推荐使用这种语法。这种方法通常比用字符串的语法更简单。在输入的字符串中含有反斜杠和双引号的情况下，必须使用转义语法，如果使用字符串的语法，反斜杠的数目必须翻倍（详细信息参考本章6.13.6 节），使用数据行构造器则要简单一些，反斜杠的数目不需要翻倍。 例如：
+
+ROW('fuzzy dice', 42, 1.99)
+
+ROW('', 42, NULL)
+
+ROW(E'/"', 42,88),1000) --E'/"' 表示输入的是一个双引号
+
+ROW(E'//', 42,88), 1000 --E'//'表示输入的是一个反斜杠
+
+ 
+
+只要数据行构造器中出现的域的个数超过一个，ROW关键字也可以被省略，例如，ROW('fuzzy dice', 42, 1.99)和('fuzzy dice', 42, 1.99)是等价的。
+
+ 
+
+       复合数据类型的值在被输出时，如果它的某个域是字符串类型，而且这个域的值中含有反斜杠和双引号，那么一个反斜杠将用两个反斜杠表示，一个双引号将用两个双引号表示。空串用两个双引号表示。如果字符串里面含有逗号、双引号、括号、空格和反斜杠，这个字符串将用两个双引号括起来，其它的字符串不会用双引号括起来。例如：
+
+INSERT INTO on_hand VALUES (ROW(E'/"', 42,88), 1000);
+
+INSERT INTO on_hand VALUES (ROW(E'//', 42,88), 1000);
+
+INSERT INTO on_hand VALUES (ROW('', 42,88), 1000); --注意，ROW里面的第一值是两个单引号，不是一个双引号
+
+INSERT INTO on_hand VALUES (ROW('fuzzy dice', 42, 1.99), 1000);
+
+INSERT INTO on_hand VALUES (ROW('(fuzzy', 42, 1.99), 1000);
+
+INSERT INTO on_hand VALUES (ROW('fuzzy', 42, 1.99), 1000);
+
+test=# select * from on_hand;
+
+item | count
+
+--------------------------+-------
+
+("""",42,88) | 1000
+
+("//",42,88) | 1000
+
+("",42,88) | 1000
+
+("fuzzy dice",42,1.99) | 1000
+
+("(fuzzy",42,1.99) | 1000
+
+("fuzzy dice",42,1.99) | 1000
+
+("(fuzzy",42,1.99) | 1000
+
+(fuzzy,42,1.99) | 1000
+
+(8 rows)
+
+ 
+
+6.14.3 访问复合类型的值
+       要访问一个复合类型的值的某个域，可以使用类似下面的语法：
+
+SELECT (item).name FROM on_hand WHERE (item).price > 9.99;
+
+ 
+
+       列名必须用括号括起来，如果item没有用括号括起来，系统会认为item是一个表的名字，而不是表on_hand中的列的名字，也可以在列名前面加上表的名字，例如：
+
+SELECT (on_hand.item).name FROM on_hand WHERE (on_hand.item).price > 9.99;
+
+   
+
+如果一个函数返回一个复合类型的值，要访问这个值的某个域，也要使用上面的语法，例如：
+
+SELECT (my_func(...)).field FROM ...
+
+6.14.4 更新复合类型的值
+    如果要更新一个复合类型的值的所有域，使用类似下面的语法：
+
+UPDATE mytab SET complex_col = ROW(1.1,2.2);  --假定表mytab的列complex_col的数据类型是在前面的例子中(在第6.14.1节里定义)定义的类型complex
+    也可以只更新一个复合类型值的某个域：
+
+UPDATE mytab SET complex_col.r = (complex_col).r + 1;
+    注意，不能把在 SET 后面出现的列名用括号括起来，但是在等号右边的表达式中引用同一个列时要把列名用括号括起来。
+
+    INSERT语句中也可以指定只为列的某些域提供值，例如：
+
+INSERT INTO mytab (complex_col.r, complex_col.i) VALUES(1.1, 2.2);
+    如果没有为列的所有域提供值，那么剩下的域将用空值填充。
+
+ 
+
+6.15 对象标识符类型（oid）
+    oid 类型是一个无符号的四字节整数。PostgreSQL 在数据库内部使用oid类型的列作为各种系统表的主键。用户创建的表也可以有一个类型为oid的列（建表时使用WITH OIDS子句），因为oid类型只是一个四字节的整数，在一个很大的表中，oid的值可能不唯一，所以不要在用户创建的表中使用 oid 类型的列作为主键。oid类型的列对于用户建立的表没有任何作用，最好不要在用户创建的表中添加系统列oid。
+
+ 
+
+6.16 伪类型
+       PostgreSQL中有一种特殊的数据类型，这种数据类型叫伪类型。一个伪类型不能作为表的列的数据类型。伪类型只能被用作函数的参数的数据类型和函数的返回值的数据类型。表6-21列出了所有的伪类型。
+
+ 
+
+表 6-21. 伪类型
+
+类型名称
+
+描述
+
+anyarray
+
+表明函数接受或返回任意数组类型
+
+anyelement
+
+表明函数接受或返回任意数据类型
+
+anyenum
+
+表明函数接受或返回任意枚举类型
+
+anynonarray
+
+表明函数接受或返回任意非数组类型
+
+cstring
+
+表明函数接受或返回任意以/0结束的字符串
+
+internal
+
+表明函数接受或返回任意服务器内部的数据类型
+
+record
+
+表明函数返回一个不确定的数据行行类型
+
+trigger
+
+表明函数将在触发器中使用。
+
+void
+
+表明函数没有返回值
+
+ 
+
+用 C语言编写的函数（无论是数据库内置的还是动态装载的）都可以接受或者返回任意的伪数据类型。函数的作者应该保证函数在使用伪数据类型的数据时可以正常地工作。
+
+ 
+
+用过程语言编写的函数只能使用适用于该过程语言的伪数据类型。当前，所有的过程语言都能使用使用 void 和 record 作为函数返回值的数据类型（如果函数用做触发器，它的返回值的类型必须是trigger）。PL/pgSQL 还支持anyelement、anyarray、anynonarray和anyenum作为函数的参数和返回值的数据类型。
+
+伪类型internal用于声明那些只能在数据库系统内部被调用的函数，这些函数不能在用户的SQL查询里被直接调用。如果函数至少有一个internal 类型的参数，SQL查询就不能直接调用它。只有在函数除至少有一个 internal类型的参数的情况下，才能将函数的返回值的类型定义为internal类型，一定要遵守这条规则。
+
+ 
+
+anyelement、anyarray、anynonarray和anyenum又被叫做多态数据类型，使用这些数据类型的函数叫做多态函数。多态函数的参数的数据类型是不确定，实际的数据类型由传递给函数的参数的数据类型决定。anyelement表示任意数据类型，包括数组类型。anyarray表示任意数组类型。anyenum表示任意枚举类型。anynonarray表示任意非数组类型。
+
+ 
+
+如果一个函数的返回值的数据类型是多态类型，那么该函数至少有一个参数的类型是多态类型。
+
+
+转载自https://blog.csdn.net/neo_liu0000/article/details/6254086
